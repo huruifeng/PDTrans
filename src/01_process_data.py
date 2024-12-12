@@ -1,7 +1,6 @@
 import os.path
 import pandas as pd
 
-
 # %%
 
 output_folder = "../results/processed"
