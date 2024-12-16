@@ -38,6 +38,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\results\training_testing\PDBP_data_previous_current_next.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
       </map>
     </option>
   </component>

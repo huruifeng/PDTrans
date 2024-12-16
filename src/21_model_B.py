@@ -11,6 +11,7 @@
   * Prepare a data table with columns: current expression data, current UPDRS, time period until next visit, UPDRS of next visit
 '''
 import pandas as pd
+from sklearn.metrics import r2_score
 
 '''
 Build a model to predict the UPDRS of next visit (in 12 months), This is a regression model
@@ -32,11 +33,12 @@ import numpy as np
 
 # Define the dataset class
 class UPDRSDataset(Dataset):
-    def __init__(self, expression_data, current_updrs, time_periods, next_updrs):
+    def __init__(self, expression_data, current_updrs, time_periods, next_updrs, indices=None):
         self.expression_data = expression_data
         self.current_updrs = current_updrs
         self.time_periods = time_periods
         self.next_updrs = next_updrs
+        self.indices = indices  # Add indices
 
     def __len__(self):
         return len(self.next_updrs)
@@ -47,6 +49,7 @@ class UPDRSDataset(Dataset):
             torch.tensor(self.current_updrs[idx], dtype=torch.float32),
             torch.tensor(self.time_periods[idx], dtype=torch.float32),
             torch.tensor(self.next_updrs[idx], dtype=torch.float32),
+            self.indices[idx],  # Include the index
         )
 
 # Define the Transformer-based model
@@ -90,12 +93,15 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
 
     run_len = len(train_loader) // 10
 
+    loss_df = pd.DataFrame(columns=["Epoch", "Train Loss", "Val Loss"])
     for epoch in range(num_epochs):
         model.train()
+        all_targets = []
+        all_predictions = []
         epoch_loss = 0.0
         print(f"Epoch %{len(str(num_epochs))}d/%d " % (epoch + 1,num_epochs), end="", flush=True)
 
-        for i, (expression_data, current_updrs, time_periods, next_updrs) in enumerate(train_loader,0):
+        for i, (expression_data, current_updrs, time_periods, next_updrs, indices) in enumerate(train_loader,0):
             expression_data = expression_data.to(device)
             current_updrs = current_updrs.to(device)
             time_periods = time_periods.to(device)
@@ -112,12 +118,19 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
 
             epoch_loss += loss.item()
 
+            all_targets.extend(next_updrs.cpu().numpy())
+            all_predictions.extend(outputs.cpu().detach().numpy())
+
             if i % run_len  == 0:
                 print("#", end="", flush=True)
-        print(f" Loss: {epoch_loss / len(train_loader):>.4f}", end="", flush=True)
+        # Calculate R² score for the epoch
+        r2 = r2_score(all_targets, all_predictions)
+        print(f" Loss: {epoch_loss / len(train_loader):>.4f}, R²: {r2:.4f}", end="", flush=True)
 
         if val_loader is not None:
             model.eval()
+            all_targets = []
+            all_predictions = []
             val_loss = 0.0
             with torch.no_grad():
                 for expression_data, current_updrs, time_periods, next_updrs in val_loader:
@@ -129,14 +142,24 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
                     outputs = model(expression_data, current_updrs, time_periods)
                     loss = criterion(outputs, next_updrs)
                     val_loss += loss.item()
-            print(f", Val Loss: {val_loss / len(val_loader):>.4f}", end="", flush=True)
+
+                    # Store predictions and targets for R² calculation
+                    all_targets.extend(next_updrs.cpu().numpy())
+                    all_predictions.extend(outputs.cpu().numpy())
+            # Calculate R² score for the epoch
+            r2 = r2_score(all_targets, all_predictions)
+            print(f", Val Loss: {val_loss / len(val_loader):>.4f}, R²: {r2:.4f}", end="", flush=True)
+
+        loss_df.loc[epoch] = [epoch, epoch_loss / len(train_loader), val_loss / len(val_loader) if val_loader is not None else np.nan]
         print()
 
     print("Training completed.")
+    return loss_df
 
 ## Test the model
 def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
     criterion = nn.MSELoss()
+    model.to(device)
     model.eval()
     total_loss = 0.0
 
@@ -144,8 +167,9 @@ def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_av
 
     run_len = len(dataloader) // 10
 
+    results = []
     with torch.no_grad():
-        for i, (expression_data, current_updrs, time_periods, next_updrs) in enumerate(dataloader,0):
+        for i, (expression_data, current_updrs, time_periods, next_updrs, index) in enumerate(dataloader,0):
             expression_data = expression_data.to(device)
             current_updrs = current_updrs.to(device)
             time_periods = time_periods.to(device)
@@ -157,8 +181,15 @@ def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_av
 
             if i % run_len == 0:
                 print("#", end="", flush=True)
+
+            for idx, actual, predicted in zip(index,next_updrs.cpu().detach().numpy(), outputs.cpu().detach().numpy()):
+                results.append((idx.item(), actual.item(), predicted.item()))
+
+    results_df = pd.DataFrame(results, columns=["Sample","Actual", "Predicted"])
     print(f" Test Loss: {total_loss / len(dataloader):>.4f}")
     print("Test completed.")
+
+    return results_df
 
 
 if __name__ == "__main__":
@@ -167,20 +198,44 @@ if __name__ == "__main__":
     df = df.dropna(axis=0)
     num_genes = 874
 
-    test_df = df.sample(frac=0.2)
-    train_df = df.drop(test_df.index)
+    val_df = df.sample(frac=0.2)
+    train_df = df.drop(val_df.index)
 
-    train_dataset = UPDRSDataset(train_df.loc[:, train_df.columns.str.startswith("ENSG")].values, train_df["current_updrs"].values, train_df["time_period"].values, train_df["next_updrs"].values)
+    train_dataset = UPDRSDataset(train_df.loc[:, train_df.columns.str.startswith("ENSG")].values, train_df["current_updrs"].values, train_df["time_period"].values, train_df["next_updrs"].values, train_df.index.values)
     train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
-    val_dataset = UPDRSDataset(test_df.loc[:, test_df.columns.str.startswith("ENSG")].values, test_df["current_updrs"].values, test_df["time_period"].values, test_df["next_updrs"].values)
+    val_dataset = UPDRSDataset(val_df.loc[:, val_df.columns.str.startswith("ENSG")].values, val_df["current_updrs"].values, val_df["time_period"].values, val_df["next_updrs"].values, val_df.index.values)
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = UPDRSTransformer(num_genes=num_genes)
-    train_model(model, train_dataloader, val_dataloader, num_epochs=100, learning_rate=1e-4, device=device)
+    loss_df = train_model(model, train_dataloader, val_dataloader, num_epochs=100, learning_rate=1e-4, device=device)
+
+    loss_df.to_csv("../results/training_testing/PPMI_model_B_loss.csv")
+    print("Loss saved.")
 
     torch.save(model.state_dict(), "../models/PPMI_model_B.pt")
     print("Model saved.")
+
+
+    ## Test the model
+    test_df = pd.read_csv("../results/training_testing/PDBP_data_current_next.csv", index_col=0)
+    test_dataset = UPDRSDataset(test_df.loc[:, test_df.columns.str.startswith("ENSG")].values, test_df["current_updrs"].values, test_df["time_period"].values, test_df["next_updrs"].values,  test_df.index.values)
+    test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+    model = UPDRSTransformer(num_genes=num_genes)
+    model.load_state_dict(torch.load("../models/PDBP_model_B.pt"))
+    test_results_df = test_model(model, val_dataloader, device=device)
+    print("Test completed.")
+
+    ## Calculate R^2
+    r2 = r2_score(test_results_df["Actual"], test_results_df["Predicted"])
+    print(f"R^2 score: {r2:.4f}")
+
+    ## Save the test results
+    test_results_df.to_csv("../results/training_testing/PDBP_test_results.csv")
+    print("Test results saved.")
+
+
 
