@@ -47,7 +47,7 @@ for patient in patient_visit_df.index:
         temp_df.index = [current_visit]
         df = pd.concat([df,temp_df],axis=0)
 
-df.to_csv("../results/training_sets/PPMI_data_current_next.csv",index=True)
+df.to_csv("../results/training_testing/PPMI_data_current_next.csv",index=True)
 
 
 # %%
@@ -102,5 +102,5 @@ for patient_visit in patient_visit_ls:
     temp_df.index = [current_visit]
     df = pd.concat([df, temp_df], axis=0)
 
-df.to_csv("../results/training_sets/PPMI_data_previous_current_next.csv", index=True)
+df.to_csv("../results/training_testing/PPMI_data_previous_current_next.csv", index=True)
 

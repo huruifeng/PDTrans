@@ -162,7 +162,7 @@ def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_av
 
 
 if __name__ == "__main__":
-    df = pd.read_csv("../results/training_sets/PPMI_data_current_next.csv", index_col=0)
+    df = pd.read_csv("../results/training_testing/PPMI_data_current_next.csv", index_col=0)
     ## remove rows if THERE IS MISSING DATA
     df = df.dropna(axis=0)
     num_genes = 874
