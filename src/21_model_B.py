@@ -10,8 +10,7 @@
 * <u>BB is the most general model design for Bx model, and it can be used for both BA and BB by setting the time period as 12 for BA</u>
   * Prepare a data table with columns: current expression data, current UPDRS, time period until next visit, UPDRS of next visit
 '''
-import pandas as pd
-from sklearn.metrics import r2_score
+from matplotlib import pyplot as plt
 
 '''
 Build a model to predict the UPDRS of next visit (in 12 months), This is a regression model
@@ -30,6 +29,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
+
+import pandas as pd
+from sklearn.metrics import r2_score, mean_squared_error
 
 # Define the dataset class
 class UPDRSDataset(Dataset):
@@ -56,7 +58,7 @@ class UPDRSDataset(Dataset):
 class UPDRSTransformer(nn.Module):
     def __init__(self, num_genes, d_model=128, nhead=8, num_layers=12, dropout=0.1):
         super(UPDRSTransformer, self).__init__()
-        self.input_layer = nn.Linear(num_genes, d_model)  # +2 for current UPDRS and time period
+        self.input_layer = nn.Linear(num_genes, d_model) # Input layer
         self.transformer = nn.Transformer(d_model=d_model, nhead=nhead, num_encoder_layers=num_layers, dropout=dropout)
         self.combined_layer = nn.Linear(d_model + 2, 16)
         self.output_layer = nn.Linear(16, 1)  # Single output for regression
@@ -133,7 +135,7 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
             all_predictions = []
             val_loss = 0.0
             with torch.no_grad():
-                for expression_data, current_updrs, time_periods, next_updrs in val_loader:
+                for expression_data, current_updrs, time_periods, next_updrs, indices in val_loader:
                     expression_data = expression_data.to(device)
                     current_updrs = current_updrs.to(device)
                     time_periods = time_periods.to(device)
@@ -169,7 +171,7 @@ def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_av
 
     results = []
     with torch.no_grad():
-        for i, (expression_data, current_updrs, time_periods, next_updrs, index) in enumerate(dataloader,0):
+        for i, (expression_data, current_updrs, time_periods, next_updrs, indices) in enumerate(dataloader,0):
             expression_data = expression_data.to(device)
             current_updrs = current_updrs.to(device)
             time_periods = time_periods.to(device)
@@ -182,8 +184,8 @@ def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_av
             if i % run_len == 0:
                 print("#", end="", flush=True)
 
-            for idx, actual, predicted in zip(index,next_updrs.cpu().detach().numpy(), outputs.cpu().detach().numpy()):
-                results.append((idx.item(), actual.item(), predicted.item()))
+            for idx, actual, predicted in zip(indices,next_updrs.cpu().detach().numpy(), outputs.cpu().detach().numpy()):
+                results.append((idx, actual.item(), predicted.item()))
 
     results_df = pd.DataFrame(results, columns=["Sample","Actual", "Predicted"])
     print(f" Test Loss: {total_loss / len(dataloader):>.4f}")
@@ -215,7 +217,7 @@ if __name__ == "__main__":
     loss_df.to_csv("../results/training_testing/PPMI_model_B_loss.csv")
     print("Loss saved.")
 
-    torch.save(model.state_dict(), "../models/PPMI_model_B.pt")
+    torch.save(model.state_dict(), "../models/model_B.pt")
     print("Model saved.")
 
 
@@ -225,7 +227,7 @@ if __name__ == "__main__":
     test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     model = UPDRSTransformer(num_genes=num_genes)
-    model.load_state_dict(torch.load("../models/PDBP_model_B.pt"))
+    model.load_state_dict(torch.load("../models/model_B.pt"))
     test_results_df = test_model(model, val_dataloader, device=device)
     print("Test completed.")
 
@@ -233,9 +235,18 @@ if __name__ == "__main__":
     r2 = r2_score(test_results_df["Actual"], test_results_df["Predicted"])
     print(f"R^2 score: {r2:.4f}")
 
+    # %%
+    ## plot actual vs predicted
+    plt.scatter(test_results_df["Actual"], test_results_df["Predicted"])
+    plt.xlabel("Actual")
+    plt.ylabel("Predicted")
+    plt.title("Actual vs Predicted")
+    plt.show()
+
     ## Save the test results
     test_results_df.to_csv("../results/training_testing/PDBP_test_results.csv")
     print("Test results saved.")
+
 
 
 

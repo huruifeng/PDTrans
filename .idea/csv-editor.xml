@@ -17,20 +17,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\results\training_sets\PPMI_data_current_next.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\results\training_sets\PPMI_data_previous_current_next.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\results\training_testing\PDBP_data_current_next.csv">
           <value>
             <Attribute>
