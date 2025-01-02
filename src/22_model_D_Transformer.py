@@ -2,6 +2,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from scipy.stats import pearsonr
 from sklearn.metrics import r2_score
 from torch.utils.data import DataLoader, Dataset
 
@@ -104,6 +105,7 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
 
         # Calculate R-squared for training set
         train_r2 = r2_score(all_targets, all_predictions)
+        train_pcc = pearsonr(all_targets, all_predictions)[0]
 
         # Validation step
         if val_loader:
@@ -125,11 +127,12 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
                     val_predictions.extend(outputs.squeeze().cpu().numpy())
 
             val_r2 = r2_score(val_targets, val_predictions)
+            val_pcc = pearsonr(val_targets, val_predictions)[0]
             print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader):.4f}, "
-                  f"Train R²: {train_r2:.4f}, Val Loss: {val_loss / len(val_loader):.4f}, Val R²: {val_r2:.4f}")
+                  f"Train R²: {train_r2:.4f}, PCC: {train_pcc:.4f}, Val Loss: {val_loss / len(val_loader):.4f}, Val R²: {val_r2:.4f}, Val PCC: {val_pcc:.4f}")
         else:
             print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader):.4f}, "
-                  f"Train R²: {train_r2:.4f}")
+                  f"Train R²: {train_r2:.4f}, PCC: {train_pcc:.4f}")
 
     print("Training completed.")
 
@@ -155,4 +158,4 @@ if __name__ == "__main__":
     train_model(model, dataloader, num_epochs=100, learning_rate=1e-3, device=device)
 
     # Save the model
-    torch.save(model.state_dict(), 'model_D_Transformer_model.pt')
+    torch.save(model.state_dict(), '../models/model_D_Transformer_model.pt')

@@ -11,6 +11,7 @@
   * Prepare a data table with columns: current expression data, current UPDRS, time period until next visit, UPDRS of next visit
 '''
 from matplotlib import pyplot as plt
+from scipy.stats import pearsonr
 
 '''
 Build a model to predict the UPDRS of next visit (in 12 months), This is a regression model
@@ -128,7 +129,8 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
                 print("#", end="", flush=True)
         # Calculate R² score for the epoch
         r2 = r2_score(all_targets, all_predictions)
-        print(f" Loss: {epoch_loss / len(train_loader):>.4f}, R²: {r2:.4f}", end="", flush=True)
+        pcc = pearsonr(all_targets, all_predictions)[0]
+        print(f" Loss: {epoch_loss / len(train_loader):>.4f}, R²: {r2:.4f}, PCC: {pcc:.4f}", end="", flush=True)
 
         if val_loader is not None:
             model.eval()
@@ -151,7 +153,8 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
                     all_predictions.extend(outputs.cpu().numpy())
             # Calculate R² score for the epoch
             r2 = r2_score(all_targets, all_predictions)
-            print(f", Val Loss: {val_loss / len(val_loader):>.4f}, R²: {r2:.4f}", end="", flush=True)
+            pcc = pearsonr(all_targets, all_predictions)[0]
+            print(f", Val Loss: {val_loss / len(val_loader):>.4f}, R²: {r2:.4f}, PCC: {pcc:.4f}", end="", flush=True)
 
         loss_df.loc[epoch] = [epoch, epoch_loss / len(train_loader), val_loss / len(val_loader) if val_loader is not None else np.nan]
         print()
@@ -188,6 +191,7 @@ def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_av
             for idx, actual, predicted in zip(indices,next_updrs.cpu().detach().numpy(), outputs.cpu().detach().numpy()):
                 results.append((idx, actual.item(), predicted.item()))
 
+    print("")
     results_df = pd.DataFrame(results, columns=["Sample","Actual", "Predicted"])
     print(f" Test Loss: {total_loss / len(dataloader):>.4f}")
     print("Test completed.")
@@ -237,7 +241,8 @@ if __name__ == "__main__":
 
     ## Calculate R^2
     r2 = r2_score(test_results_df["Actual"], test_results_df["Predicted"])
-    print(f"R^2 score: {r2:.4f}")
+    pcc = pearsonr(test_results_df["Actual"], test_results_df["Predicted"])[0]
+    print(f"R^2 score: {r2:.4f}, PCC: {pcc:.4f}")
 
     # %%
     ## plot actual vs predicted

@@ -33,6 +33,7 @@ ppmi_samples = [x_i for x_i in all_samples if x_i.startswith("PP-")]
 clin_data_ppmi = clin_data.loc[ppmi_samples,:]
 expr_data_ppmi = expr_data.loc[:,ppmi_samples]
 clin_data_ppmi.to_csv(output_folder+"/sample_meta_ppmi.csv")
+expr_data_ppmi.to_csv(output_folder+"/sample_expr_ppmi.csv")
 
 
 pdbp_samples = [x_i for x_i in all_samples if x_i.startswith("PD-")]
