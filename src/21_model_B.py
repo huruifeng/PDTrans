@@ -60,7 +60,7 @@ class UPDRSTransformer(nn.Module):
         super(UPDRSTransformer, self).__init__()
         self.input_layer = nn.Linear(num_genes, d_model) # Input layer
         self.transformer = nn.Transformer(d_model=d_model, nhead=nhead, num_encoder_layers=num_layers, dropout=dropout)
-        self.combined_layer = nn.Linear(d_model + 2, 16)
+        self.combined_layer = nn.Linear(d_model + 1, 16)
         self.output_layer = nn.Linear(16, 1)  # Single output for regression
         self.relu = nn.ReLU()
 
@@ -80,7 +80,8 @@ class UPDRSTransformer(nn.Module):
         # Remove sequence dimension and pass through output layer
         x = x.squeeze(1)  # (batch_size, d_model)
 
-        x = torch.cat([x, current_updrs.unsqueeze(1), time_periods.unsqueeze(1)], dim=1)
+        # x = torch.cat([x, current_updrs.unsqueeze(1), time_periods.unsqueeze(1)], dim=1)
+        x = torch.cat([x, current_updrs.unsqueeze(1)], dim=1)
         x = self.relu(self.combined_layer(x))
 
         output = self.output_layer(x)  # (batch_size, 1)
@@ -93,7 +94,7 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     model.to(device)
 
-    run_len = len(train_loader) // 10
+    run_len = len(train_loader) // 10 + 1
 
     loss_df = pd.DataFrame(columns=["Epoch", "Train Loss", "Val Loss"])
     for epoch in range(num_epochs):
@@ -167,7 +168,7 @@ def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_av
 
     print("Testing...")
 
-    run_len = len(dataloader) // 10
+    run_len = len(dataloader) // 10 + 1
 
     results = []
     with torch.no_grad():
@@ -198,6 +199,7 @@ if __name__ == "__main__":
     df = pd.read_csv("../results/training_testing/PPMI_data_current_next.csv", index_col=0)
     ## remove rows if THERE IS MISSING DATA
     df = df.dropna(axis=0)
+    df = df.loc[df["time_period"] == 12,:]
     num_genes = 874
 
     val_df = df.sample(frac=0.2)
@@ -223,13 +225,15 @@ if __name__ == "__main__":
 
     ## Test the model
     test_df = pd.read_csv("../results/training_testing/PDBP_data_current_next.csv", index_col=0)
+    test_df = test_df.dropna(axis=0)
+    test_df = test_df.loc[test_df["time_period"] == 12, :]
+
     test_dataset = UPDRSDataset(test_df.loc[:, test_df.columns.str.startswith("ENSG")].values, test_df["current_updrs"].values, test_df["time_period"].values, test_df["next_updrs"].values,  test_df.index.values)
     test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     model = UPDRSTransformer(num_genes=num_genes)
     model.load_state_dict(torch.load("../models/model_B.pt"))
-    test_results_df = test_model(model, val_dataloader, device=device)
-    print("Test completed.")
+    test_results_df = test_model(model, test_dataloader, device=device)
 
     ## Calculate R^2
     r2 = r2_score(test_results_df["Actual"], test_results_df["Predicted"])
