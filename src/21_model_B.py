@@ -254,7 +254,7 @@ if __name__ == "__main__":
     plt.show()
 
     ## Save the test results
-    test_results_df.to_csv("../results/training_testing/PDBP_test_results.csv")
+    test_results_df.to_csv("../results/training_testing/PDBP_model_B_test_results.csv")
     print("Test results saved.")
 
 

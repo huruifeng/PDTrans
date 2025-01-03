@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -74,6 +75,7 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
 
     run_len = len(train_loader) // 10
 
+    loss_df = pd.DataFrame(columns=["Epoch", "Train Loss", "Val Loss"])
     for epoch in range(num_epochs):
         model.train()
         all_targets = []
@@ -130,6 +132,8 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
         else:
             print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader):.4f}, "
                   f"Train R²: {train_r2:.4f}, PCC: {train_pcc:.4f}")
+
+        loss_df.loc[epoch] = [epoch, epoch_loss / len(train_loader), val_loss / len(val_loader) if val_loader is not None else np.nan]
 
     print("Training completed.")
 
@@ -239,6 +243,6 @@ if __name__ == "__main__":
     plt.show()
 
     ## Save the test results
-    test_results_df.to_csv("../results/training_testing/PDBP_test_results.csv")
+    test_results_df.to_csv("../results/training_testing/PDBP_model_D_test_results.csv")
     print("Test results saved.")
 
