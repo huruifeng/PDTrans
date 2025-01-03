@@ -8,6 +8,9 @@ from scipy.stats import pearsonr
 from sklearn.metrics import r2_score
 from torch.utils.data import DataLoader, Dataset
 
+from src.utils.plots import plot_scatter
+
+
 # Define the dataset class
 class UPDRSDataset(Dataset):
     def __init__(self, genes_current, updrs_current, genes_previous, updrs_previous, updrs_next):
@@ -127,6 +130,7 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
 
             val_r2 = r2_score(val_targets, val_predictions)
             val_pcc = pearsonr(val_targets, val_predictions)[0]
+            # plot_scatter(val_targets, val_predictions, title=f"Epoch {epoch + 1}/{num_epochs}, Val R²: {val_r2:.4f}, Val PCC: {val_pcc:.4f}", plot_show=False, save_path=f"../results/training_testing/PPMI_model_D_val_scatter_{epoch + 1}.png")
             print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader):.4f}, "
                   f"Train R²: {train_r2:.4f}, PCC: {train_pcc:.4f}, Val Loss: {val_loss / len(val_loader):.4f}, Val R²: {val_r2:.4f}, Val PCC: {val_pcc:.4f}")
         else:
@@ -200,7 +204,8 @@ if __name__ == "__main__":
 
     ## PCC between current and next updrs in validation set
     pcc = pearsonr(updrs_t2[val_index].values, updrs_t3[val_index].values)[0]
-    print(f"PCC between current and next updrs in validation set: {pcc}")
+    r2 = r2_score(updrs_t2[val_index].values, updrs_t3[val_index].values)
+    print(f"PCC between current and next updrs in validation set: {pcc}, R^2: {r2}")
 
     # Initialize and train the model
     num_genes = 874
@@ -229,7 +234,8 @@ if __name__ == "__main__":
 
     ## PCC between current and next updrs in test set
     pcc = pearsonr(updrs_t2.values, updrs_t3.values)[0]
-    print(f"PCC between current and next updrs in testing set: {pcc}")
+    r2 = r2_score(updrs_t2.values, updrs_t3.values)
+    print(f"PCC between current and next updrs in testing set: {pcc}, R^2: {r2}")
 
     model = TransformerPredictor(num_genes)
     model.load_state_dict(torch.load('../models/model_D_Transformer_model.pt'))
