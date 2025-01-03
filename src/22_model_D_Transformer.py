@@ -198,6 +198,10 @@ if __name__ == "__main__":
                                gene_expression_t2.loc[val_index,:].values, updrs_t2[val_index].values, updrs_t3[val_index].values)
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
+    ## PCC between current and next updrs in validation set
+    pcc = pearsonr(updrs_t2[val_index].values, updrs_t3[val_index].values)[0]
+    print(f"PCC between current and next updrs in validation set: {pcc}")
+
     # Initialize and train the model
     num_genes = 874
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -222,6 +226,10 @@ if __name__ == "__main__":
     test_dataset = UPDRSDataset(gene_expression_t1.values, updrs_t1.values,
                                gene_expression_t2.values, updrs_t2.values, updrs_t3.values)
     test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=True)
+
+    ## PCC between current and next updrs in test set
+    pcc = pearsonr(updrs_t2.values, updrs_t3.values)[0]
+    print(f"PCC between current and next updrs in testing set: {pcc}")
 
     model = TransformerPredictor(num_genes)
     model.load_state_dict(torch.load('../models/model_D_Transformer_model.pt'))
