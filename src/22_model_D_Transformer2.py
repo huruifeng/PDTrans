@@ -10,106 +10,176 @@
 * <u>DB is the most general model design for Dx model, and it can be used for both DA and DB by setting the time period as 0 for DA </u>
   * Prepare a data table with columns: expression data, current UPDRS, 1 previous expression data, 1 previous UPDRS, time period until next visit, UPDRS of next visit
 '''
-
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from scipy.stats import pearsonr
+from sklearn.metrics import r2_score
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
 
 
 # Define the dataset class
 class UPDRSDataset(Dataset):
-    def __init__(self, genes_time_series, updrs_time_series):
-        self.genes_time_series = genes_time_series  # Shape: (num_samples, time_points, num_genes)
-        self.updrs_time_series = updrs_time_series  # Shape: (num_samples, time_points)
+    def __init__(self, genes_previous, updrs_previous, genes_current, updrs_current, updrs_next):
+        self.genes_previous = genes_previous
+        self.updrs_previous = updrs_previous
+        self.genes_current = genes_current
+        self.updrs_current = updrs_current
+        self.updrs_time_series = np.concatenate([self.updrs_previous, self.updrs_current])
+        self.genes_time_series = np.concatenate([self.genes_previous, self.genes_current])
+        self.updrs_next = updrs_next
+
 
     def __len__(self):
-        return len(self.updrs_time_series)
+        return len(self.updrs_next)
 
     def __getitem__(self, idx):
         return (
-            torch.tensor(self.genes_time_series[idx], dtype=torch.float32),
-            torch.tensor(self.updrs_time_series[idx, :-1], dtype=torch.float32),  # Inputs: all but last
-            torch.tensor(self.updrs_time_series[idx, -1], dtype=torch.float32),  # Target: last time point
+            torch.tensor(self.genes_previous[idx], dtype=torch.float32),
+            torch.tensor(self.updrs_previous[idx], dtype=torch.float32),
+            torch.tensor(self.genes_current[idx], dtype=torch.float32),
+            torch.tensor(self.updrs_current[idx], dtype=torch.float32),
+            torch.tensor(self.updrs_next[idx], dtype=torch.float32)
         )
 
 
 # Define the Transformer model
 class TransformerPredictor(nn.Module):
-    def __init__(self, num_genes, hidden_size=128, num_heads=4, num_layers=2, dropout=0.1):
+    def __init__(self, num_genes, hidden_size=512, num_heads=8, num_layers=12, dropout=0.1):
         super(TransformerPredictor, self).__init__()
-        self.embedding = nn.Linear(num_genes + 1, hidden_size)  # Embedding for gene + UPDRS data
-        self.transformer = nn.Transformer(
+        self.gene_embedding = nn.Linear(num_genes, hidden_size)  # Embedding for gene
+        self.updrs_embedding = nn.Linear(1, hidden_size)  # Embedding for UPDRS
+
+        self.gene_transformer = nn.Transformer(
             d_model=hidden_size, nhead=num_heads, num_encoder_layers=num_layers,
-            num_decoder_layers=0, dim_feedforward=hidden_size * 4, dropout=dropout, batch_first=True
+            num_decoder_layers=num_layers, dropout=dropout, batch_first=False
         )
-        self.fc = nn.Linear(hidden_size, 1)  # Fully connected layer for regression
 
-    def forward(self, genes_time_series, updrs_time_series):
-        # Concatenate gene expression and UPDRS at each time point
-        x = torch.cat([genes_time_series, updrs_time_series.unsqueeze(-1)], dim=2)
+        self.updrs_transformer = nn.Transformer(
+            d_model=hidden_size, nhead=num_heads, num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers, dropout=dropout, batch_first=False
+        )
 
-        # Pass through embedding layer
-        x = self.embedding(x)  # Shape: (batch_size, seq_len, hidden_size)
+        self.fc = nn.Linear(hidden_size, 1)
 
-        # Pass through Transformer (no decoder, encoder only)
-        transformer_out = self.transformer(x, x)  # Shape: (batch_size, seq_len, hidden_size)
+        self.relu = nn.ReLU()
 
-        # Use the output corresponding to the last time step
-        last_out = transformer_out[:, -1, :]  # Shape: (batch_size, hidden_size)
+    def forward(self, genes_previous, updrs_previous, genes_current, updrs_current):
+        genes_previous = self.gene_embedding(genes_previous)
+        updrs_previous = self.updrs_embedding(updrs_previous)
+        genes_current = self.gene_embedding(genes_current)
+        updrs_current = self.updrs_embedding(updrs_current)
 
-        # Pass through fully connected layer
-        output = self.fc(last_out)
-        return output.squeeze(1)  # Return as (batch_size)
+        # Pass through the transformer
+        gene_transformer_output = self.gene_transformer(
+            src=torch.cat([genes_previous], dim=1),
+            tgt=torch.cat([genes_current], dim=1)
+        )
+
+        updrs_transformer_output = self.updrs_transformer(
+            src=torch.cat([updrs_previous], dim=1),
+            tgt=torch.cat([updrs_current], dim=1)
+        )
+
+        output = torch.cat([gene_transformer_output, updrs_transformer_output], dim=1)
+
+        output = self.relu(output)
+        output = self.relu(self.fc(output))
+        return output
 
 
 # Training function
-def train_model(model, dataloader, num_epochs, learning_rate, device):
+def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_rate=0.001, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     model.to(device)
 
+    run_len = len(train_loader) // 10 + 1
+
     for epoch in range(num_epochs):
         model.train()
+        all_targets = []
+        all_predictions = []
         epoch_loss = 0.0
-
-        for genes_time_series, updrs_time_series, target_updrs in dataloader:
-            genes_time_series = genes_time_series.to(device)
-            updrs_time_series = updrs_time_series.to(device)
-            target_updrs = target_updrs.to(device)
+        for i,(genes_previous, updrs_previous,genes_current, updrs_current, updrs_next) in enumerate(train_loader,0):
+            genes_current, updrs_current = genes_current.to(device), updrs_current.to(device)
+            genes_previous, updrs_previous = genes_previous.to(device), updrs_previous.to(device)
+            updrs_next = updrs_next.to(device)
 
             # Forward pass
-            outputs = model(genes_time_series, updrs_time_series)
-            loss = criterion(outputs, target_updrs)
+            outputs = model(genes_current, updrs_current, genes_previous, updrs_previous)
+            loss = criterion(outputs.squeeze(), updrs_next)
 
-            # Backward pass
+            # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             epoch_loss += loss.item()
+            all_targets.extend(updrs_next.cpu().numpy())
+            all_predictions.extend(outputs.squeeze().detach().cpu().numpy())
 
-        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss / len(dataloader):.4f}")
+            if i % run_len  == 0:
+                print(".", end="", flush=True)
 
+        # Calculate R-squared for training set
+        train_r2 = r2_score(all_targets, all_predictions)
+        train_pcc = pearsonr(all_targets, all_predictions)[0]
+
+        # Validation step
+        if val_loader:
+            model.eval()
+            val_loss = 0.0
+            val_targets = []
+            val_predictions = []
+            with torch.no_grad():
+                for genes_previous, updrs_previous,genes_current, updrs_current, updrs_next in val_loader:
+                    genes_previous, updrs_previous = genes_previous.to(device), updrs_previous.to(device)
+                    genes_current, updrs_current = genes_current.to(device), updrs_current.to(device)
+                    updrs_next = updrs_next.to(device)
+
+                    outputs = model(genes_current, updrs_current, genes_previous, updrs_previous)
+                    loss = criterion(outputs.squeeze(), updrs_next)
+                    val_loss += loss.item()
+
+                    val_targets.extend(updrs_next.cpu().numpy())
+                    val_predictions.extend(outputs.squeeze().cpu().numpy())
+
+            val_r2 = r2_score(val_targets, val_predictions)
+            val_pcc = pearsonr(val_targets, val_predictions)[0]
+            print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader):.4f}, "
+                  f"Train R²: {train_r2:.4f}, PCC: {train_pcc:.4f}, Val Loss: {val_loss / len(val_loader):.4f}, Val R²: {val_r2:.4f}, Val PCC: {val_pcc:.4f}")
+        else:
+            print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader):.4f}, "
+                  f"Train R²: {train_r2:.4f}, PCC: {train_pcc:.4f}")
+
+    print("Training completed.")
 
 # Example usage
 if __name__ == "__main__":
-    # Generate synthetic data for demonstration
-    num_samples = 1000
+    # Load and preprocess data
+    df = pd.read_csv("../results/training_testing/PPMI_data_previous_current_next.csv", index_col=0).dropna()
+
     num_genes = 874
-    time_points = 3
+    gene_expression_t1 = df.loc[:, df.columns.str.startswith('previous_ENSG')].values
+    gene_expression_t2 = df.loc[:, df.columns.str.startswith('current_ENSG')].values
+    updrs_t1 = df['previous_updrs'].values
+    updrs_t2 = df['current_updrs'].values
+    updrs_t3 = df['next_updrs'].values
 
-    genes_time_series = np.random.rand(num_samples, time_points, num_genes)
-    updrs_time_series = np.random.rand(num_samples, time_points)
-
-    dataset = UPDRSDataset(genes_time_series, updrs_time_series)
+    # Create dataset and dataloader
+    dataset = UPDRSDataset(gene_expression_t1, updrs_t1,gene_expression_t2, updrs_t2,updrs_t3)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
+    # Initialize and train the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = TransformerPredictor(num_genes)
+    train_model(model, dataloader, num_epochs=100, learning_rate=1e-3, device=device)
 
-    model = TransformerPredictor(num_genes=num_genes)
-    train_model(model, dataloader, num_epochs=20, learning_rate=1e-3, device=device)
-
-    ## Save the model
-    torch.save(model.state_dict(), 'model_D_Transformer2_model.pt')
+    # Save the model
+    torch.save(model.state_dict(), '../models/model_D_Transformer2_model.pt')

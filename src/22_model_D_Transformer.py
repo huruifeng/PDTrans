@@ -9,10 +9,10 @@ from torch.utils.data import DataLoader, Dataset
 # Define the dataset class
 class UPDRSDataset(Dataset):
     def __init__(self, genes_current, updrs_current, genes_previous, updrs_previous, updrs_next):
-        self.genes_current = genes_current
-        self.updrs_current = updrs_current
         self.genes_previous = genes_previous
         self.updrs_previous = updrs_previous
+        self.genes_current = genes_current
+        self.updrs_current = updrs_current
         self.updrs_next = updrs_next
 
     def __len__(self):
@@ -20,19 +20,19 @@ class UPDRSDataset(Dataset):
 
     def __getitem__(self, idx):
         return (
-            torch.tensor(self.genes_current[idx], dtype=torch.float32),
-            torch.tensor(self.updrs_current[idx], dtype=torch.float32),
             torch.tensor(self.genes_previous[idx], dtype=torch.float32),
             torch.tensor(self.updrs_previous[idx], dtype=torch.float32),
+            torch.tensor(self.genes_current[idx], dtype=torch.float32),
+            torch.tensor(self.updrs_current[idx], dtype=torch.float32),
             torch.tensor(self.updrs_next[idx], dtype=torch.float32),
         )
 
 # Define the Transformer model
 class TransformerPredictor(nn.Module):
-    def __init__(self, num_genes, hidden_size=128, num_heads=8, num_layers=12, dropout=0.1):
+    def __init__(self, num_genes, hidden_size=1024, num_heads=4, num_layers=6, dropout=0.1):
         super(TransformerPredictor, self).__init__()
         # Transformer encoder layers
-        gene_encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads, dim_feedforward=hidden_size * 4, dropout=dropout)
+        gene_encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads, dropout=dropout)
         self.gene_transformer = nn.TransformerEncoder(gene_encoder_layer, num_layers=num_layers)
 
         # Linear layers for input transformation
@@ -43,7 +43,7 @@ class TransformerPredictor(nn.Module):
         self.fc = nn.Linear(hidden_size + 1, 1)
         self.relu = nn.ReLU()
 
-    def forward(self, genes_current, updrs_current, genes_previous, updrs_previous):
+    def forward(self, genes_previous, updrs_previous,genes_current, updrs_current):
         # Transform gene inputs
         gene_previous = self.input_gene(genes_previous).unsqueeze(1)  # Shape: (batch_size, 1, hidden_size)
         gene_current = self.input_gene(genes_current).unsqueeze(1)  # Shape: (batch_size, 1, hidden_size)
@@ -82,13 +82,13 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
         all_targets = []
         all_predictions = []
         epoch_loss = 0.0
-        for i,(genes_current, updrs_current, genes_previous, updrs_previous, updrs_next) in enumerate(train_loader,0):
-            genes_current, updrs_current = genes_current.to(device), updrs_current.to(device)
+        for i,(genes_previous, updrs_previous,genes_current, updrs_current, updrs_next) in enumerate(train_loader,0):
             genes_previous, updrs_previous = genes_previous.to(device), updrs_previous.to(device)
+            genes_current, updrs_current = genes_current.to(device), updrs_current.to(device)
             updrs_next = updrs_next.to(device)
 
             # Forward pass
-            outputs = model(genes_current, updrs_current, genes_previous, updrs_previous)
+            outputs = model(genes_previous, updrs_previous, genes_current, updrs_current)
             loss = criterion(outputs.squeeze(), updrs_next)
 
             # Backward pass and optimization
@@ -114,9 +114,9 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
             val_targets = []
             val_predictions = []
             with torch.no_grad():
-                for genes_current, updrs_current, genes_previous, updrs_previous, updrs_next in val_loader:
-                    genes_current, updrs_current = genes_current.to(device), updrs_current.to(device)
+                for genes_previous, updrs_previous, genes_current, updrs_current, updrs_next in val_loader:
                     genes_previous, updrs_previous = genes_previous.to(device), updrs_previous.to(device)
+                    genes_current, updrs_current = genes_current.to(device), updrs_current.to(device)
                     updrs_next = updrs_next.to(device)
 
                     outputs = model(genes_current, updrs_current, genes_previous, updrs_previous)
@@ -139,23 +139,34 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
 # Example usage
 if __name__ == "__main__":
     # Load and preprocess data
-    df = pd.read_csv("../results/training_testing/PPMI_data_previous_current_next.csv", index_col=0).dropna()
+    df = pd.read_csv("../results/training_testing/PPMI_data_previous_current_next.csv", index_col=0)
+    df = df.dropna(axis=0)
 
-    num_genes = 874
-    gene_expression_t1 = df.loc[:, df.columns.str.startswith('previous_ENSG')].values
-    gene_expression_t2 = df.loc[:, df.columns.str.startswith('current_ENSG')].values
-    updrs_t1 = df['previous_updrs'].values
-    updrs_t2 = df['current_updrs'].values
-    updrs_t3 = df['next_updrs'].values
+    gene_expression_t1 = df.loc[:, df.columns.str.startswith('previous_ENSG')]
+    gene_expression_t2 = df.loc[:, df.columns.str.startswith('current_ENSG')]
+    updrs_t1 = df['previous_updrs']
+    updrs_t2 = df['current_updrs']
+    updrs_t3 = df['next_updrs']
 
     # Create dataset and dataloader
-    dataset = UPDRSDataset(gene_expression_t2, updrs_t2, gene_expression_t1, updrs_t1, updrs_t3)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    val_index = df.sample(frac=0.2).index
+    train_index = df.drop(val_index).index
+
+    train_dataset = UPDRSDataset(gene_expression_t1.loc[train_index,:].values, updrs_t1[train_index].values,
+                                 gene_expression_t2.loc[train_index,:].values, updrs_t2[train_index].values, updrs_t3[train_index].values)
+    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+    val_dataset = UPDRSDataset(gene_expression_t1.loc[val_index,:].values, updrs_t1[val_index].values,
+                               gene_expression_t2.loc[val_index,:].values, updrs_t2[val_index].values, updrs_t3[val_index].values)
+    val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     # Initialize and train the model
+    num_genes = 874
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+
     model = TransformerPredictor(num_genes)
-    train_model(model, dataloader, num_epochs=100, learning_rate=1e-3, device=device)
+    train_model(model, train_dataloader, val_dataloader, num_epochs=100, learning_rate=1e-3, device=device)
 
     # Save the model
     torch.save(model.state_dict(), '../models/model_D_Transformer_model.pt')

@@ -57,7 +57,7 @@ class UPDRSDataset(Dataset):
 
 # Define the Transformer-based model
 class UPDRSTransformer(nn.Module):
-    def __init__(self, num_genes, d_model=128, nhead=8, num_layers=12, dropout=0.1):
+    def __init__(self, num_genes, d_model=512, nhead=8, num_layers=12, dropout=0.1):
         super(UPDRSTransformer, self).__init__()
         self.input_layer = nn.Linear(num_genes, d_model) # Input layer
         self.transformer = nn.Transformer(d_model=d_model, nhead=nhead, num_encoder_layers=num_layers, dropout=dropout)
@@ -76,7 +76,7 @@ class UPDRSTransformer(nn.Module):
         x = x.unsqueeze(1)  # (batch_size, seq_len=1, d_model)
 
         # Pass through transformer
-        x = self.transformer(x, x)  # Self-attention for seq_len=1
+        x = self.transformer.encoder(x)  # Self-attention for seq_len=1
 
         # Remove sequence dimension and pass through output layer
         x = x.squeeze(1)  # (batch_size, d_model)
@@ -193,7 +193,7 @@ def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_av
 
     print("")
     results_df = pd.DataFrame(results, columns=["Sample","Actual", "Predicted"])
-    print(f" Test Loss: {total_loss / len(dataloader):>.4f}")
+    print(f"Test Loss: {total_loss / len(dataloader):>.4f}")
     print("Test completed.")
 
     return results_df
@@ -216,6 +216,7 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
 
     model = UPDRSTransformer(num_genes=num_genes)
     loss_df = train_model(model, train_dataloader, val_dataloader, num_epochs=100, learning_rate=1e-4, device=device)
