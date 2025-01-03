@@ -46,25 +46,21 @@ class TransformerPredictor(nn.Module):
 
     def forward(self, genes_previous, updrs_previous,genes_current, updrs_current):
         # Transform gene inputs
-        gene_previous = self.input_gene(genes_previous).unsqueeze(1)  # Shape: (batch_size, 1, hidden_size)
-        gene_current = self.input_gene(genes_current).unsqueeze(1)  # Shape: (batch_size, 1, hidden_size)
-
-        # Process gene inputs through the transformer
-        genes_combined = torch.cat([gene_previous, gene_current], dim=1)  # Shape: (batch_size, seq_len=2, hidden_size)
+        genes_previous = self.input_gene(genes_previous).unsqueeze(1)  # Shape: (batch_size, 1, hidden_size)
+        genes_current = self.input_gene(genes_current).unsqueeze(1)  # Shape: (batch_size, 1, hidden_size)
+        genes_combined = torch.cat([genes_previous, genes_current], dim=1)  # Shape: (batch_size, seq_len=2, hidden_size)
         genes_output = self.gene_transformer(genes_combined).mean(dim=1)  # Shape: (batch_size, hidden_size)
 
         # Transform UPDRS inputs
         updrs_previous = self.input_updrs(updrs_previous.unsqueeze(1)).unsqueeze(1)  # Shape: (batch_size, 1, hidden_size)
         updrs_current = self.input_updrs(updrs_current.unsqueeze(1)).unsqueeze(1)  # Shape: (batch_size, 1, hidden_size)
         updrs_combined = torch.cat([updrs_previous, updrs_current],dim=1)  # Shape: (batch_size, seq_len=2, hidden_size)
-
-        # Aggregate UPDRS features
         updrs_output = updrs_combined.mean(dim=1)  # Shape: (batch_size, hidden_size)
 
         # Combine features
-        combined = torch.cat([genes_output, updrs_output], dim=1)  # Shape: (batch_size, hidden_size * 2)
-        output = self.fc(combined)  # Shape: (batch_size, 1)
-        return self.relu(output)
+        combined = torch.cat([genes_output, updrs_output], dim=1)  # Shape: (batch_size, hidden_size + 1)
+        output = self.relu(self.fc(combined))  # Shape: (batch_size, 1)
+        return output
 
 
 # Training function
