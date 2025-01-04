@@ -84,6 +84,7 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
         all_targets = []
         all_predictions = []
         epoch_loss = 0.0
+        print(f"Epoch %{len(str(num_epochs))}d/%d " % (epoch + 1, num_epochs), end="", flush=True)
         for i,(genes_previous, updrs_previous,genes_current, updrs_current, updrs_next) in enumerate(train_loader,0):
             genes_previous, updrs_previous = genes_previous.to(device), updrs_previous.to(device)
             genes_current, updrs_current = genes_current.to(device), updrs_current.to(device)
@@ -108,6 +109,7 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
         # Calculate R-squared for training set
         train_r2 = r2_score(all_targets, all_predictions)
         train_pcc = pearsonr(all_targets, all_predictions)[0]
+        print(f" Loss: {epoch_loss / len(train_loader):>.4f}, R²: {train_r2:.4f}, PCC: {train_pcc:.4f}", end="", flush=True)
 
         # Validation step
         if val_loader:
@@ -131,15 +133,14 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
             val_r2 = r2_score(val_targets, val_predictions)
             val_pcc = pearsonr(val_targets, val_predictions)[0]
             # plot_scatter(val_targets, val_predictions, title=f"Epoch {epoch + 1}/{num_epochs}, Val R²: {val_r2:.4f}, Val PCC: {val_pcc:.4f}", plot_show=False, save_path=f"../results/training_testing/PPMI_model_D_val_scatter_{epoch + 1}.png")
-            print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader):.4f}, "
-                  f"Train R²: {train_r2:.4f}, PCC: {train_pcc:.4f}, Val Loss: {val_loss / len(val_loader):.4f}, Val R²: {val_r2:.4f}, Val PCC: {val_pcc:.4f}")
-        else:
-            print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader):.4f}, "
-                  f"Train R²: {train_r2:.4f}, PCC: {train_pcc:.4f}")
+            print(f", Val Loss: {val_loss / len(val_loader):>.4f}, R²: {val_r2:.4f}, PCC: {val_pcc:.4f}", end="", flush=True)
 
         loss_df.loc[epoch] = [epoch, epoch_loss / len(train_loader), val_loss / len(val_loader) if val_loader is not None else np.nan]
+        print("")
 
     print("Training completed.")
+
+    return loss_df
 
 
 ## Test the model
