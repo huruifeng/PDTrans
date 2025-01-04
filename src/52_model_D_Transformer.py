@@ -205,7 +205,7 @@ if __name__ == "__main__":
     ## PCC between current and next updrs in validation set
     pcc = pearsonr(updrs_t2[val_index].values, updrs_t3[val_index].values)[0]
     r2 = r2_score(updrs_t2[val_index].values, updrs_t3[val_index].values)
-    print(f"PCC between current and next updrs in validation set: {pcc}, R^2: {r2}")
+    print(f"PCC between current and next updrs in validation set: {pcc:.4f}, R^2: {r2:.4f}")
 
     # Initialize and train the model
     num_genes = 874
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     ## PCC between current and next updrs in test set
     pcc = pearsonr(updrs_t2.values, updrs_t3.values)[0]
     r2 = r2_score(updrs_t2.values, updrs_t3.values)
-    print(f"PCC between current and next updrs in testing set: {pcc}, R^2: {r2}")
+    print(f"PCC between current and next updrs in testing set: {pcc:.4f}, R^2: {r2:.4f}")
 
     model = TransformerPredictor(num_genes)
     model.load_state_dict(torch.load('../models/model_D_Transformer_model.pt'))

@@ -218,7 +218,7 @@ if __name__ == "__main__":
     ## PCC between current and next updrs in validation set
     pcc = pearsonr(val_df["current_updrs"].values, val_df["next_updrs"].values)[0]
     r2 = r2_score(val_df["current_updrs"].values, val_df["next_updrs"].values)
-    print(f"PCC between current and next updrs in validation set: {pcc}, R^2: {r2}")
+    print(f"PCC between current and next updrs in validation set: {pcc:.4f}, R^2: {r2:.4f}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     ## PCC between current and next updrs in test set
     pcc = pearsonr(test_df["current_updrs"].values, test_df["next_updrs"].values)[0]
     r2 = r2_score(test_df["current_updrs"].values, test_df["next_updrs"].values)
-    print(f"PCC between current and next updrs in testing set: {pcc}, R^2: {r2}")
+    print(f"PCC between current and next updrs in testing set: {pcc:.4f}, R^2: {r2:.4f}")
 
     model = UPDRSTransformer(num_genes=num_genes)
     model.load_state_dict(torch.load("../models/model_B.pt"))
