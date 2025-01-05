@@ -3,6 +3,13 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
+        <entry key="\results\processed\PDBP_meta_m18.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\results\processed\PDBP_patient_visits.csv">
           <value>
             <Attribute>
@@ -39,6 +46,27 @@
           </value>
         </entry>
         <entry key="\results\training_testing\PDBP_data_previous_current_next.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\results\training_testing\PPMI_data_previous_current_next.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\results\training_testing\UPDRS2\PPMI_data_previous_current_next.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\results\training_testing\UPDRS3\PPMI_data_previous_current_next.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

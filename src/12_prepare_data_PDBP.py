@@ -10,6 +10,7 @@ gene_ls = DEG_df.index.tolist()
 
 expr_df = pd.read_csv("../results/processed/sample_expr_pdbp.csv", index_col=0, header=0)
 meta_df = pd.read_csv("../results/processed/sample_meta_pdbp.csv", index_col=0, header=0)
+meta_df["UPDRS123Sum"] = meta_df["mds_updrs_part_i_summary_score"] + meta_df["mds_updrs_part_ii_summary_score"] + meta_df["mds_updrs_part_iii_summary_score"]
 
 patient_visit_df = pd.read_csv("../results/processed/PDBP_patient_visits.csv", index_col=0, header=0)
 # PPMI viits: m0, m6, m12, m24, m36
@@ -35,11 +36,11 @@ for patient in patient_visit_df.index:
     for i in range(len(patient_visit_ls)-1):
         current_visit = patient_visit_ls[i][1]
         current_expr = list(expr_df.loc[gene_ls,current_visit].T.values)
-        current_updrs = meta_df.loc[current_visit,"mds_updrs_part_iii_summary_score"]
+        current_updrs = meta_df.loc[current_visit,"UPDRS123Sum"]
 
         next_visit = patient_visit_ls[i + 1][1]
         # next_expr = expr_df.loc[gene_ls,next_visit].T
-        next_updrs = meta_df.loc[next_visit,"mds_updrs_part_iii_summary_score"]
+        next_updrs = meta_df.loc[next_visit,"UPDRS123Sum"]
 
         time_period = visit_month[patient_visit_ls[i + 1][0]] - visit_month[patient_visit_ls[i][0]]
 
@@ -48,7 +49,7 @@ for patient in patient_visit_df.index:
         df = pd.concat([df,temp_df],axis=0)
 
 print(df.shape)
-df.to_csv("../results/training_testing/PDBP_data_current_next.csv",index=True)
+df.to_csv("../results/training_testing/UPDRS123Sum/PDBP_data_current_next.csv",index=True)
 
 
 # %%
@@ -77,14 +78,14 @@ for patient_visit in patient_visit_ls:
     patient_visit = list(patient_visit)
     previous_visit = patient_visit[0][1]
     previous_expr = list(expr_df.loc[gene_ls, previous_visit].T.values)
-    previous_updrs = meta_df.loc[previous_visit, "mds_updrs_part_iii_summary_score"]
+    previous_updrs = meta_df.loc[previous_visit, "UPDRS123Sum"]
 
     current_visit = patient_visit[1][1]
     current_expr = list(expr_df.loc[gene_ls, current_visit].T.values)
-    current_updrs = meta_df.loc[current_visit, "mds_updrs_part_iii_summary_score"]
+    current_updrs = meta_df.loc[current_visit, "UPDRS123Sum"]
 
     next_visit = patient_visit[2][1]
-    next_updrs = meta_df.loc[next_visit, "mds_updrs_part_iii_summary_score"]
+    next_updrs = meta_df.loc[next_visit, "UPDRS123Sum"]
 
     time_period = visit_month[patient_visit[2][0]] - visit_month[patient_visit[1][0]]
 
@@ -95,5 +96,5 @@ for patient_visit in patient_visit_ls:
     df = pd.concat([df, temp_df], axis=0)
 
 print(df.shape)
-df.to_csv("../results/training_testing/PDBP_data_previous_current_next.csv", index=True)
+df.to_csv("../results/training_testing/UPDRS123Sum/PDBP_data_previous_current_next.csv", index=True)
 

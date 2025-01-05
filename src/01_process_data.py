@@ -20,7 +20,7 @@ col_list = ['participant_id','Study','sex','age_at_baseline',
             'mds_updrs_part_iii_summary_score','mds_updrs_part_iv_summary_score']
 clin_data = clin_data.loc[:,col_list]
 clin_data.info()
-clin_data = clin_data.loc[~clin_data.mds_updrs_part_ii_summary_score.isna(),:]
+# clin_data = clin_data.loc[~clin_data.mds_updrs_part_ii_summary_score.isna(),:]
 
 all_samples = [x_i for x_i in list(clin_data.index) if x_i in list(expr_data.columns)]
 
