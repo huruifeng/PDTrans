@@ -144,7 +144,9 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
 
 
 ## Test the model
-def test_model(model, test_dataloader, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+def test_model(model, test_dataloader, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.eval()
     criterion = nn.MSELoss()

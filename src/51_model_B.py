@@ -90,7 +90,10 @@ class UPDRSTransformer(nn.Module):
         return output.squeeze(1)  # Return as (batch_size)
 
 # Training function
-def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_rate=0.001, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_rate=0.001, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     model.to(device)
@@ -163,7 +166,10 @@ def train_model(model, train_loader, val_loader=None, num_epochs=30, learning_ra
     return loss_df
 
 ## Test the model
-def test_model(model, dataloader, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+def test_model(model, dataloader, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     criterion = nn.MSELoss()
     model.to(device)
     model.eval()
