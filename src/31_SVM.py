@@ -10,7 +10,7 @@ if __name__ == "__main__":
     df = df.dropna(axis=0)
     df = df.loc[df["time_period"] == 12, :]
 
-    val_df = df.sample(frac=0.2)
+    val_df = df.sample(frac=0.2, random_state=42)
     train_df = df.drop(val_df.index)
 
     x_train = train_df.loc[:, train_df.columns.str.startswith("ENSG") | train_df.columns.str.startswith("current_updrs")].values

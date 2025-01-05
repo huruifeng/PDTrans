@@ -206,7 +206,7 @@ if __name__ == "__main__":
     df = df.loc[df["time_period"] == 12,:]
     num_genes = 874
 
-    val_df = df.sample(frac=0.2)
+    val_df = df.sample(frac=0.2, random_state=42)
     train_df = df.drop(val_df.index)
 
     train_dataset = UPDRSDataset(train_df.loc[:, train_df.columns.str.startswith("ENSG")].values, train_df["current_updrs"].values, train_df["time_period"].values, train_df["next_updrs"].values, train_df.index.values)

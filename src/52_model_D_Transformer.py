@@ -192,7 +192,7 @@ if __name__ == "__main__":
     updrs_t3 = df['next_updrs']
 
     # Create dataset and dataloader
-    val_index = df.sample(frac=0.2).index
+    val_index = df.sample(frac=0.2, random_state=42).index
     train_index = df.drop(val_index).index
 
     train_dataset = UPDRSDataset(gene_expression_t1.loc[train_index,:].values, updrs_t1[train_index].values,
