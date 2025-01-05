@@ -59,7 +59,28 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\results\training_testing\UPDRS123Sum\PPMI_data_previous_current_next.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\results\training_testing\UPDRS1\PPMI_data_previous_current_next.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\results\training_testing\UPDRS2\PPMI_data_previous_current_next.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\results\training_testing\UPDRS3\PDBP_data_previous_current_next.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

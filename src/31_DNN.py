@@ -89,7 +89,8 @@ def test_model(model, test_loader, device="cpu"):
 
 
 if __name__ == "__main__":
-    df = pd.read_csv("../results/training_testing/PPMI_data_current_next.csv", index_col=0)
+    data_folder = "UPDRS1"
+    df = pd.read_csv(f"../results/training_testing/{data_folder}/PPMI_data_current_next.csv", index_col=0)
     ## remove rows if THERE IS MISSING DATA
     df = df.dropna(axis=0)
     df = df.loc[df["time_period"] == 12, :]
@@ -128,7 +129,7 @@ if __name__ == "__main__":
 
 
    ## predictions
-    test_df = pd.read_csv("../results/training_testing/PDBP_data_current_next.csv", index_col=0)
+    test_df = pd.read_csv(f"../results/training_testing/{data_folder}/PDBP_data_current_next.csv", index_col=0)
     test_df = test_df.dropna(axis=0)
 
     x_test = test_df.loc[:, test_df.columns.str.startswith("ENSG") | test_df.columns.str.startswith("current_updrs")].values

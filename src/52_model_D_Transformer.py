@@ -181,8 +181,9 @@ def test_model(model, test_dataloader, device=torch.device("cuda" if torch.cuda.
 
 # Example usage
 if __name__ == "__main__":
+    data_folder = "UPDRS1"
     # Load and preprocess data
-    df = pd.read_csv("../results/training_testing/PPMI_data_previous_current_next.csv", index_col=0)
+    df = pd.read_csv(f"../results/training_testing/{data_folder}/PPMI_data_previous_current_next.csv", index_col=0)
     df = df.dropna(axis=0)
 
     gene_expression_t1 = df.loc[:, df.columns.str.startswith('previous_ENSG')]
@@ -217,10 +218,10 @@ if __name__ == "__main__":
     train_model(model, train_dataloader, val_dataloader, num_epochs=100, learning_rate=1e-3, device=device)
 
     # Save the model
-    torch.save(model.state_dict(), '../models/model_D_Transformer_model.pt')
+    torch.save(model.state_dict(), f'../results/training_testing/{data_folder}/model_D.pt')
 
     ## Test the model
-    test_df = pd.read_csv("../results/training_testing/PPMI_data_previous_current_next.csv", index_col=0)
+    test_df = pd.read_csv(f"../results/training_testing/{data_folder}/PPMI_data_previous_current_next.csv", index_col=0)
     test_df = test_df.dropna(axis=0)
 
     gene_expression_t1 = test_df.loc[:, test_df.columns.str.startswith('previous_ENSG')]
@@ -239,7 +240,7 @@ if __name__ == "__main__":
     print(f"PCC between current and next updrs in testing set: {pcc:.4f}, R^2: {r2:.4f}")
 
     model = TransformerPredictor(num_genes)
-    model.load_state_dict(torch.load('../models/model_D_Transformer_model.pt'))
+    model.load_state_dict(torch.load(f'../results/training_testing/{data_folder}/model_D.pt'))
     model.to(device)
 
     test_results_df = test_model(model, test_dataloader, device)
@@ -258,6 +259,6 @@ if __name__ == "__main__":
     plt.show()
 
     ## Save the test results
-    test_results_df.to_csv("../results/training_testing/PDBP_model_D_test_results.csv")
+    test_results_df.to_csv(f"../results/training_testing/{data_folder}/PDBP_model_D_test_results.csv")
     print("Test results saved.")
 
